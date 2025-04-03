@@ -12,13 +12,22 @@ app = Flask(__name__)
 
 @app.route("/hr-agent", methods=["POST"])
 def handle_hr_query():
-    data = request.get_json()
-    query = data.get("query")
-
-    if not query:
-        return jsonify({"error": "Missing query"}), 400
-
     try:
+        # Debug logging to inspect what Answerly is sending
+        print("===== Incoming Request =====")
+        print("Headers:", dict(request.headers))
+        print("Raw Body:", request.data.decode('utf-8'))
+        try:
+            data = request.get_json(force=True)
+            print("Parsed JSON:", data)
+        except Exception as e:
+            print("Failed to parse JSON:", e)
+            return jsonify({"error": "Invalid JSON"}), 400
+
+        query = data.get("query")
+        if not query:
+            return jsonify({"error": "Missing query"}), 400
+
         # Step 1: Create a thread
         thread = openai.beta.threads.create()
 
@@ -44,16 +53,13 @@ def handle_hr_query():
 
         # Step 5: Get response
         messages = openai.beta.threads.messages.list(thread_id=thread.id)
-        full_text = messages.data[0].content[0].text.value
+        latest_message = messages.data[0].content[0].text.value
 
-        # Strip citation (everything from the first "【" onward)
-        response_text = full_text.split("【")[0].strip()
-
-        return jsonify({"response": response_text})
+        return jsonify({"response": latest_message})
 
     except Exception as e:
+        print("Error occurred:", e)
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000, debug=True)
-
+    app.run(debug=True, host="0.0.0.0", port=10000)
