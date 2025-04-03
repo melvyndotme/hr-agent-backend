@@ -1,65 +1,32 @@
 from flask import Flask, request, jsonify
-import os
-import openai
-from dotenv import load_dotenv
-import time
-
-load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
-assistant_id = os.getenv("HR_ASSISTANT_ID")
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route("/hr-agent", methods=["POST"])
-def handle_hr_query():
+def hr_agent():
     try:
-        # Debug logging to inspect what Answerly is sending
-        print("===== Incoming Request =====")
-        print("Headers:", dict(request.headers))
-        print("Raw Body:", request.data.decode('utf-8'))
-        try:
-            data = request.get_json(force=True)
-            print("Parsed JSON:", data)
-        except Exception as e:
-            print("Failed to parse JSON:", e)
-            return jsonify({"error": "Invalid JSON"}), 400
+        data = request.get_json(force=True)
+        user_query = data.get("query")
 
-        query = data.get("query")
-        if not query:
-            return jsonify({"error": "Missing query"}), 400
+        if not user_query:
+            return jsonify({"error": "Missing 'query' in request"}), 400
 
-        # Step 1: Create a thread
-        thread = openai.beta.threads.create()
+        # Simulated logic for demonstration
+        if "leave" in user_query.lower():
+            answer = (
+                "You are entitled to a minimum of 14 days of annual leave per year "
+                "as per the company's leave policy. Leave must be applied for in advance "
+                "and approved by your supervisor."
+            )
+        else:
+            answer = "I'm not sure how to answer that. Please contact HR for more details."
 
-        # Step 2: Add user message
-        openai.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=query
-        )
-
-        # Step 3: Run the assistant
-        run = openai.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant_id
-        )
-
-        # Step 4: Poll for completion
-        while True:
-            status = openai.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-            if status.status == "completed":
-                break
-            time.sleep(1)
-
-        # Step 5: Get response
-        messages = openai.beta.threads.messages.list(thread_id=thread.id)
-        latest_message = messages.data[0].content[0].text.value
-
-        return jsonify({"response": latest_message})
+        return jsonify({"response": answer})
 
     except Exception as e:
-        print("Error occurred:", e)
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=10000, debug=True)
